@@ -9,6 +9,10 @@ The example here uses maplibre as base layer displaying vector-tile-based basema
 - BKG basemaps for Germany with: style: `https://gdz.bkg.bund.de/index.php/default/gdz-basemapde-vektor-gdz-basemapde-vektor.html`
 - OpenFreeMaps with: style: `https://tiles.openfreemap.org/styles/liberty`
 
+## Issues 
 
+Everything works, however, note that animations (for a "smooth" zooming experience) are currently turned off. I did not manage yet to get smooth zooming for both leaflet & maplibre at the same time without delay. 
+
+For Leaflet, you can turn it on again with: `zoomAnimation: false,`, then the markers etc. will be animated. However, it creates an annoying offset for the animation duration between the actual coordinates of the markers vs. the basemap (that is not animated). 
 
 
