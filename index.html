@@ -52,7 +52,7 @@
       // --- MAPLIBRE (BACKGROUND) INITIALIZATION ---
       const maplibreMap = new maplibregl.Map({
         container: 'map-maplibre',
-        style: 'style.json', // Ensure style.json is in the same directory or provide correct path
+        style: 'https://tiles.openfreemap.org/styles/liberty', // or a style.json you provide
         hash: 'map', // Note: MapLibre might try to update hash. If Leaflet also handles hash, consider disabling one.
         center: initialCenter,
         zoom: initialZoom - 1, // MapLibre is one zoom level out
