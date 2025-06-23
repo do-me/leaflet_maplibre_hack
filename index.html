@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Leaflet 0.7.7 on MapLibre with External Style - Smooth Zoom</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- 1. Include Library CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/leaflet.css" />
+  <link href='https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.css' rel='stylesheet' />
+  <!-- 2. Custom CSS for Layering -->
+  <style>
+    body { margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    #map-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    #map-maplibre {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
+    }
+    #map-leaflet {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;
+      background-color: transparent !important;
+    }
+    .leaflet-tile-pane {
+      visibility: hidden;
+    }
+  </style>
+</head>
+<body>
+  <!-- 3. HTML Containers for the Maps -->
+  <div id="map-container">
+    <div id="map-maplibre"></div>
+    <div id="map-leaflet"></div>
+  </div>
+  <!-- 4. Include Library JavaScript -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/leaflet.js"></script>
+  <script src='https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.js'></script>
+  <script src="https://unpkg.com/pmtiles@3.0.6/dist/pmtiles.js"></script>
+  <!-- 5. Main Application Logic -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      // --- SETUP THE PMTILES PROTOCOL ---
+      const protocol = new pmtiles.Protocol();
+      maplibregl.addProtocol('pmtiles', protocol.tile);
+      
+      // Define initial view focused on Germany
+      const initialCenter = [51.1657, 10.4515]; // Geographic center of Germany
+      const initialZoom = 6;
+
+      // --- MAPLIBRE (BACKGROUND) INITIALIZATION ---
+      const maplibreMap = new maplibregl.Map({
+        container: 'map-maplibre',
+        style: 'style.json', // Ensure style.json is in the same directory or provide correct path
+        hash: 'map', // Note: MapLibre might try to update hash. If Leaflet also handles hash, consider disabling one.
+        center: initialCenter,
+        zoom: initialZoom - 1, // MapLibre is one zoom level out
+        interactive: false // MapLibre doesn't respond to user input
+      });
+
+      // --- LEAFLET (FOREGROUND) INITIALIZATION ---
+      const leafletMap = L.map('map-leaflet', {
+        center: initialCenter,
+        zoom: initialZoom,
+        layers: [],
+        attributionControl: false,
+        zoomAnimation: true,
+        zoomAnimationThreshold: 4
+      });
+
+      // Variable to store the last zoom level of Leaflet map
+      let lastLeafletZoom = leafletMap.getZoom();
+      let isZooming = false; // Track if we're currently in a zoom operation
+
+      // --- ADD INTERACTIVE LEAFLET CONTENT ---
+      addLeafletContent(leafletMap);
+
+      // --- SYNCHRONIZATION LOGIC ---
+
+      // Initial synchronization when MapLibre is loaded
+      maplibreMap.on('load', function () {
+        const center = leafletMap.getCenter();
+        const zoom = leafletMap.getZoom();
+        // Use easeTo for initial sync to avoid animation from a potentially different default state
+        maplibreMap.easeTo({
+          center: [center.lng, center.lat],
+          zoom: zoom - 1 
+        });
+        // Update lastLeafletZoom after initial alignment
+        lastLeafletZoom = zoom;
+      });
+
+      // Handle zoom start - trigger MapLibre zoom immediately
+      leafletMap.on('zoomstart', function() {
+        isZooming = true;
+        const center = leafletMap.getCenter();
+        const targetZoom = leafletMap.getZoom(); // This gives us the target zoom level
+        
+        // For perfect synchronization, immediately jump MapLibre to the target zoom
+        // This eliminates any timing differences between the two animation systems
+        maplibreMap.easeTo({
+          center: [center.lng, center.lat],
+          zoom: targetZoom -1,
+          duration: 50,
+        });
+        
+        lastLeafletZoom = targetZoom;
+      });
+
+      // Handle zoom end - ensure final synchronization
+      leafletMap.on('zoomend', function() {
+        isZooming = false;
+        // Final sync to ensure perfect alignment after zoom completes
+        const center = leafletMap.getCenter();
+        const currentZoom = leafletMap.getZoom();
+        
+        // Use easeTo for final alignment to avoid any drift
+        maplibreMap.easeTo({
+          center: [center.lng, center.lat],
+          zoom: currentZoom - 1 
+        });
+        
+        lastLeafletZoom = currentZoom;
+      });
+
+
+      // on move works smoothly for panning
+      function syncMaps() {
+        const center = leafletMap.getCenter();
+        const zoom = leafletMap.getZoom();
+        maplibreMap.jumpTo({
+          center: [center.lng, center.lat],
+          zoom: zoom - 1
+        });
+      }
+
+        leafletMap.on('move', syncMaps);
+    });
+
+    /**
+     * Adds markers, lines, and polygons to the Leaflet map.
+     */
+    function addLeafletContent(map) {
+      const cities = [
+        { name: 'Berlin', coords: [52.5200, 13.4050] }, { name: 'Hamburg', coords: [53.5511, 9.9937] },
+        { name: 'Munich', coords: [48.1351, 11.5820] }, { name: 'Cologne', coords: [50.9375, 6.9603] },
+        { name: 'Frankfurt', coords: [50.1109, 8.6821] }, { name: 'Stuttgart', coords: [48.7758, 9.1829] },
+        { name: 'Düsseldorf', coords: [51.2277, 6.7735] }, { name: 'Dortmund', coords: [51.5136, 7.4653] },
+        { name: 'Leipzig', coords: [51.3397, 12.3731] }, { name: 'Dresden', coords: [51.0504, 13.7373] }
+      ];
+      cities.forEach(city => L.marker(city.coords).addTo(map).bindPopup(`<b>${city.name}</b>`));
+      L.polyline([[52.5200, 13.4050], [48.1351, 11.5820]], {color: 'blue'}).addTo(map);
+      L.polyline([[53.5511, 9.9937], [50.1109, 8.6821]], {color: 'blue'}).addTo(map);
+      L.polyline([[50.9375, 6.9603], [52.5200, 13.4050]], {color: 'blue'}).addTo(map);
+      L.polyline([[48.7758, 9.1829], [51.3397, 12.3731]], {color: 'blue'}).addTo(map);
+      L.polyline([[50.1109, 8.6821], [48.1351, 11.5820]], {color: 'blue'}).addTo(map);
+      L.polygon([[48.3, 8.0], [47.8, 8.4], [48.0, 7.6]], {color: 'green'}).addTo(map).bindPopup('Black Forest');
+      L.polygon([[51.8, 10.5], [51.6, 11.0], [51.5, 10.8], [51.7, 10.3]], {color: 'darkgreen'}).addTo(map).bindPopup('Harz Mountains');
+      L.polygon([[53.5, 12.5], [53.6, 13.2], [53.3, 13.1], [53.2, 12.6]], {color: 'navy', fillColor: '#3377ff'}).addTo(map).bindPopup('Mecklenburg Lake District');
+      L.polygon([[49.5, 6.7], [49.5, 7.2], [49.2, 7.2], [49.2, 6.7]], {color: 'red'}).addTo(map).bindPopup('Saarland Area');
+      L.polygon([[51.9, 13.9], [51.85, 14.15], [51.75, 14.1], [51.8, 13.85]], {color: 'orange'}).addTo(map).bindPopup('Spreewald');
+      L.control.scale().addTo(map);
+    }
+  </script>
+</body>
+</html>
