@@ -26,6 +26,20 @@
     .leaflet-tile-pane {
       visibility: hidden;
     }
+
+    #style-switcher {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: white;
+      border: 1px solid #ccc;
+      padding: 5px 10px;
+      font-family: sans-serif;
+      font-size: 14px;
+      border-radius: 4px;
+    }
+
   </style>
 </head>
 <body>
@@ -44,7 +58,26 @@
       // --- SETUP THE PMTILES PROTOCOL ---
       const protocol = new pmtiles.Protocol();
       maplibregl.addProtocol('pmtiles', protocol.tile);
+
+      const basemapSelector = document.getElementById('basemap-style');
+
+      basemapSelector.addEventListener('change', function () {
+      const selectedStyle = this.value;
       
+      // Re-register PMTiles protocol each time we change style
+      maplibreMap.setStyle(selectedStyle);
+      
+      // After new style is loaded, re-sync center/zoom
+      maplibreMap.once('styledata', () => {
+          const center = leafletMap.getCenter();
+          const zoom = leafletMap.getZoom();
+          maplibreMap.jumpTo({
+            center: [center.lng, center.lat],
+            zoom: zoom - 1
+          });
+        });
+      });
+            
       // Define initial view focused on Germany
       const initialCenter = [51.1657, 10.4515]; // Geographic center of Germany
       const initialZoom = 6;
@@ -65,7 +98,7 @@
         zoom: initialZoom,
         layers: [],
         attributionControl: false,
-        zoomAnimation: true,
+        zoomAnimation: false,
         zoomAnimationThreshold: 4
       });
 
@@ -163,5 +196,14 @@
       L.control.scale().addTo(map);
     }
   </script>
+
+  <!-- Layer Control -->
+  <div id="style-switcher">
+  <label for="basemap-style">Base Map:</label>
+  <select id="basemap-style">
+    <option value="https://tiles.openfreemap.org/styles/liberty">OpenFreeMap Liberty</option>
+    <option value="https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_col.json">BKG Germany</option>
+  </select>
+  </div>
 </body>
 </html>
